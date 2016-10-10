@@ -1,0 +1,79 @@
+version: '2'
+services:
+  elasticsearch:
+    image: elasticsearch
+    container_name: elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - "${HOME}/docker/elasticsearch/config:/usr/share/elasticsearch/config"
+      - "${HOME}/docker/elasticsearch/data:/usr/share/elasticsearch/data"
+  zookeeper:
+    image: zookeeper
+    container_name: zookeeper
+    restart: always
+    ports:
+      - 2181:2181
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zookeepr:2888:3888
+    volumes:
+      #- "${HOME}/docker/zookeeper/config:/conf"
+      - "${HOME}/docker/zookeeper/data:/data"
+      - "${HOME}/docker/zookeeper/datalog:/datalog"
+  kafka:
+    image: letser/kafka
+    container_name: kafka
+    ports:
+      - 9092:9092
+      - 7203:7203
+    volumes:
+      - "${HOME}/docker/kafka/data:/data"
+      - "${HOME}/docker/kafka/logs:/logs"
+    depends_on:
+      - zookeeper
+    links:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: "{{LOCAL_IP}}"
+      ZOOKEEPER_IP: "{{LOCAL_IP}}"
+  nimbus:
+    image: 31z4/storm:1.0.2
+    container_name: nimbus
+    command: storm nimbus
+    depends_on:
+      - zookeeper
+    links:
+      - zookeeper
+    restart: always
+    ports:
+      - 6627:6627
+    volumes:
+      - "${HOME}/docker/storm/conf/storm.yaml:/conf/storm.yaml"
+  supervisor:
+    image: 31z4/storm:1.0.2
+    container_name: supervisor
+    command: storm supervisor
+    depends_on:
+      - nimbus
+      - zookeeper
+    links:
+      - nimbus
+      - zookeeper
+    restart: always
+    ports: 
+      - 8000:8000
+  ui:
+    image: 31z4/storm:1.0.2
+    container_name: ui
+    command: storm ui
+    depends_on:
+      - nimbus
+      - zookeeper
+    links:
+      - nimbus
+      - zookeeper
+    restart: always
+    ports: 
+      - 8080:8080
